@@ -1,0 +1,123 @@
+server {
+	server_name gitlab2.kitnic.it;
+
+
+	listen 443 ssl;
+
+	ssl_certificate /etc/letsencrypt/live/gitlab2.kitnic.it/fullchain.pem;
+	ssl_certificate_key /etc/letsencrypt/live/gitlab2.kitnic.it/privkey.pem;
+
+	ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
+	ssl_prefer_server_ciphers on;
+	ssl_dhparam /etc/ssl/certs/dhparam-freegeoip.pem;
+	ssl_ciphers 'ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:DHE-DSS-AES128-GCM-SHA256:kEDH+AESGCM:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-DSS-AES128-SHA256:DHE-RSA-AES256-SHA256:DHE-DSS-AES256-SHA:DHE-RSA-AES256-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:AES:CAMELLIA:DES-CBC3-SHA:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!aECDH:!EDH-DSS-DES-CBC3-SHA:!EDH-RSA-DES-CBC3-SHA:!KRB5-DES-CBC3-SHA';
+	ssl_session_timeout 1d;
+	ssl_session_cache shared:SSL:50m;
+	ssl_stapling on;
+	ssl_stapling_verify on;
+	add_header Strict-Transport-Security max-age=15768000;
+
+	root /home/ubuntu/kitnic/build;
+
+	index index.html index.htm index.nginx-debian.html;
+
+	location / {
+# First attempt to serve request as file, then
+# as directory, then fall back to displaying a 404.
+		try_files $uri $uri/ =404;
+	}
+
+	location ~ /.well-known {
+		allow all;
+        }
+
+	location /gitlab {
+
+		rewrite ^(/gitlab/?)$ $scheme://$server_name last;
+		if ($request_method = GET) {
+			rewrite ^(/gitlab/users/sign_in/?)$ $scheme://$server_name/sign_in;
+		}
+
+		client_max_body_size 0;
+
+		gzip off;
+
+		## https://github.com/gitlabhq/gitlabhq/issues/694
+		## Some requests take more than 30 seconds.
+		proxy_read_timeout      300;
+		proxy_connect_timeout   300;
+		proxy_redirect          off;
+
+		proxy_http_version 1.1;
+
+		proxy_set_header    Host                $http_host;
+		proxy_set_header    X-Real-IP           $remote_addr;
+		proxy_set_header    X-Forwarded-For     $proxy_add_x_forwarded_for;
+		proxy_set_header    X-Forwarded-Proto   $scheme;
+		more_set_headers    'X-Frame-Options: SAMEORIGIN';
+
+		proxy_pass https://gitlab.kitnic.it/gitlab;
+
+	}
+
+	location = /sign_in {
+
+		client_max_body_size 0;
+
+		gzip off;
+
+		## https://github.com/gitlabhq/gitlabhq/issues/694
+		## Some requests take more than 30 seconds.
+		proxy_read_timeout      300;
+		proxy_connect_timeout   300;
+		proxy_redirect          off;
+
+		proxy_intercept_errors on;
+        	error_page 404 /custom_404.html;
+        	error_page 500 502 503 504 /custom_50x.html;
+
+		proxy_http_version 1.1;
+
+		proxy_set_header    Host                $http_host;
+		proxy_set_header    X-Real-IP           $remote_addr;
+		proxy_set_header    X-Forwarded-For     $proxy_add_x_forwarded_for;
+		proxy_set_header    X-Forwarded-Proto   $scheme;
+		more_set_headers    'X-Frame-Options: SAMEORIGIN';
+
+		proxy_pass https://gitlab.kitnic.it/gitlab/users/sign_in;
+
+	}
+
+        error_page 404 /custom_404.html;
+        location = /custom_404.html {
+                root /usr/share/nginx/html;
+                internal;
+        }
+
+        error_page 500 502 503 504 /custom_50x.html;
+        location = /custom_50x.html {
+                root /usr/share/nginx/html;
+                internal;
+        }
+
+}
+
+
+# Virtual Host configuration for example.com
+#
+# You can move that to a different file under sites-available/ and symlink that
+# to sites-enabled/ to enable it.
+#
+#server {
+#	listen 80;
+#	listen [::]:80;
+#
+#	server_name example.com;
+#
+#	root /var/www/example.com;
+#	index index.html;
+#
+#	location / {
+#		try_files $uri $uri/ =404;
+#	}
+#}

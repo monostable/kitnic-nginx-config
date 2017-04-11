@@ -1,0 +1,29 @@
+server {
+    listen 80;
+
+    server_name "^preview\.kitnic\.it";
+    return 301 $scheme://kitnic.it$request_uri;
+
+}
+
+server {
+	listen 80;
+
+    	server_name "~^(?<sub>.+)\.preview\.kitnic\.it$";
+
+	root /home/ubuntu/preview/$sub;
+	index index.html index.htm;
+
+	location / {
+  	    # First attempt to serve request as file, then
+	    # as directory, then fall back to displaying a 404.
+	    try_files $uri $uri/ @kitnic;
+	    # Uncomment to enable naxsi on this location
+	    # include /etc/nginx/naxsi.rules
+	}
+	location @kitnic {
+		return 302 $scheme://kitnic.it$request_uri;
+	}
+
+}
+
